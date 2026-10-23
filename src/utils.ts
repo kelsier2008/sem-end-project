@@ -1,51 +1,119 @@
-import type { Category, Urgency } from './types';
+import type { Category } from './types';
 
 const DAY = 86_400_000;
 
-export function todayISO(): string {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+/** Midnight at the start of the local calendar day containing `d`. */
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** Whole days from today to `iso` (negative when past). Parsed as local dates. */
-export function daysUntil(iso: string): number {
-  const [y, m, d] = iso.split('-').map(Number);
-  const target = new Date(y, m - 1, d).getTime();
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  return Math.round((target - today) / DAY);
+export function isValidISO(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * Whole local calendar days from `now` to `iso` (0 = today, 1 = tomorrow, negative = earlier).
+ * Compares local midnights, so it never drifts by a day because of time zones or DST.
+ */
+export function calendarDaysUntil(iso: string, now: Date): number {
+  return Math.round((startOfDay(new Date(iso)) - startOfDay(now)) / DAY);
+}
+
+export type DeadlineState = 'overdue' | 'today' | 'soon' | 'later';
+
+export function deadlineState(iso: string, now: Date): DeadlineState {
+  if (new Date(iso).getTime() < now.getTime()) return 'overdue';
+  const days = calendarDaysUntil(iso, now);
+  if (days === 0) return 'today';
+  if (days <= 3) return 'soon';
+  return 'later';
+}
+
+/** "Due tomorrow", "Starts in 4 days", "Overdue by 2 days"… Events read as dates, not deadlines. */
+export function relativeDeadline(iso: string, now: Date, category: Category): string {
+  const days = calendarDaysUntil(iso, now);
+  const isEvent = category === 'Events';
+
+  if (new Date(iso).getTime() < now.getTime()) {
+    if (days === 0) return isEvent ? 'Earlier today' : 'Closed today';
+    const ago = -days;
+    if (isEvent) return ago === 1 ? 'Yesterday' : `${ago} days ago`;
+    return ago === 1 ? 'Overdue by 1 day' : `Overdue by ${ago} days`;
+  }
+
+  const verb = isEvent ? 'Starts' : 'Due';
+  if (days === 0) return `${verb} today`;
+  if (days === 1) return `${verb} tomorrow`;
+  return `${verb} in ${days} days`;
 }
 
 export function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function relativeDue(iso: string): string {
-  const n = daysUntil(iso);
-  if (n < -1) return `Overdue by ${-n} days`;
-  if (n === -1) return 'Overdue by 1 day';
-  if (n === 0) return 'Due today';
-  if (n === 1) return 'Due tomorrow';
-  return `Due in ${n} days`;
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
-export const categoryStyles: Record<Category, string> = {
-  Exams: 'bg-rose-50 text-rose-700 ring-rose-600/15 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20',
-  Assignments: 'bg-indigo-50 text-indigo-700 ring-indigo-600/15 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/20',
-  Events: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20',
-  Fees: 'bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
-  General: 'bg-neutral-100 text-neutral-700 ring-neutral-500/15 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-500/20',
-};
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
-export const urgencyDot: Record<Urgency, string> = {
-  low: 'bg-neutral-400',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
-};
+/** "Today", "Yesterday", "3 days ago", then a plain date. */
+export function formatPosted(iso: string, now: Date): string {
+  const days = -calendarDaysUntil(iso, now);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return formatDate(iso);
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** YYYY-MM-DD for the local day of `d`, as used by <input type="date">. */
+export function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** HH:MM for the local time of `d`, as used by <input type="time">. */
+export function toTimeInput(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Combines local date and time inputs into an ISO timestamp, or null if either is invalid. */
+export function fromLocalInputs(date: string, time: string): string | null {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const tm = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!dm || !tm) return null;
+  const [y, m, d] = [Number(dm[1]), Number(dm[2]) - 1, Number(dm[3])];
+  const result = new Date(y, m, d, Number(tm[1]), Number(tm[2]));
+  // Rejects impossible dates such as 2026-02-31, which Date would silently roll over.
+  if (result.getFullYear() !== y || result.getMonth() !== m || result.getDate() !== d) return null;
+  return result.toISOString();
+}
+
+/** Returns the URL only if it is a well-formed http(s) link; anything else (javascript:, data:…) is rejected. */
+export function safeUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
 
 export function uid(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

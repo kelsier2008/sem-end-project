@@ -1,148 +1,167 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddNoticeModal from './components/AddNoticeModal';
-import FilterBar from './components/FilterBar';
+import ConfirmDialog from './components/ConfirmDialog';
 import Navbar from './components/Navbar';
-import NoticeGrid from './components/NoticeGrid';
-import StatSummary from './components/StatSummary';
-import { seedNotices } from './data';
-import { CATEGORIES, type Category, type Notice, type QuickFilter, type SortOrder } from './types';
-import { useLocalStorage } from './useLocalStorage';
+import NoticeDetailModal from './components/NoticeDetailModal';
+import Sidebar from './components/Sidebar';
+import Toast, { type ToastMessage } from './components/Toast';
+import { getStats } from './filters';
+import DashboardPage from './pages/DashboardPage';
+import DeadlinesPage from './pages/DeadlinesPage';
+import NoticesPage from './pages/NoticesPage';
+import SettingsPage from './pages/SettingsPage';
+import { ROUTE_TITLES, navigate, useRoute, type Route } from './router';
+import { useNotices } from './state/useNotices';
+import { UIContext, type ConfirmOptions, type UIContextValue } from './state/ui';
+import type { Notice } from './types';
 import { useTheme } from './useTheme';
-import { daysUntil } from './utils';
 
-type Flags = Record<string, { isStarred?: boolean; isRead?: boolean }>;
+/** Pages where the top-bar search filters the content; elsewhere typing jumps to All Notices. */
+const SEARCHABLE: Route[] = ['notices', 'important', 'unread', 'deadlines'];
 
 export default function App() {
+  const route = useRoute();
   const { theme, toggle } = useTheme();
-  // Seed notices are static; only user-posted notices and per-notice flags are persisted.
-  const [custom, setCustom] = useLocalStorage<Notice[]>('noticeboard:custom', []);
-  const [flags, setFlags] = useLocalStorage<Flags>('noticeboard:flags', {});
+  const { notices, now, deleteNotice } = useNotices();
 
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<Category | 'All'>('All');
-  const [quick, setQuick] = useState<QuickFilter>('All');
-  const [sort, setSort] = useState<SortOrder>('newest');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [composer, setComposer] = useState<{ open: boolean; notice: Notice | null }>({ open: false, notice: null });
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [confirmOptions, setConfirmOptions] = useState<ConfirmOptions | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const firstRender = useRef(true);
 
-  const notices = useMemo<Notice[]>(
-    () => [...custom, ...seedNotices].map((n) => ({ ...n, ...flags[n.id] })),
-    [custom, flags],
-  );
-  const customIds = useMemo(() => new Set(custom.map((n) => n.id)), [custom]);
-
-  const setFlag = useCallback(
-    (id: string, key: 'isStarred' | 'isRead', value?: boolean) =>
-      setFlags((f) => {
-        const current = f[id]?.[key] ?? notices.find((n) => n.id === id)?.[key] ?? false;
-        return { ...f, [id]: { ...f[id], [key]: value ?? !current } };
-      }),
-    [setFlags, notices],
-  );
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = notices.filter(
-      (n) =>
-        (category === 'All' || n.category === category) &&
-        (quick === 'All' || (quick === 'Starred' ? n.isStarred : !n.isRead)) &&
-        (!q || [n.title, n.content, n.author, n.category].some((s) => s.toLowerCase().includes(q))),
-    );
-    return list.sort((a, b) => {
-      if (sort === 'newest') return b.date.localeCompare(a.date);
-      // Upcoming deadlines first, then past deadlines, then notices without one.
-      const rank = (n: Notice) => (!n.dueDate ? 2 : daysUntil(n.dueDate) < 0 ? 1 : 0);
-      const r = rank(a) - rank(b);
-      if (r) return r;
-      if (rank(a) === 0) return a.dueDate!.localeCompare(b.dueDate!);
-      if (rank(a) === 1) return b.dueDate!.localeCompare(a.dueDate!);
-      return b.date.localeCompare(a.date);
-    });
-  }, [notices, search, category, quick, sort]);
-
-  const counts = useMemo(() => {
-    const c = { All: notices.length } as Record<Category | 'All', number>;
-    CATEGORIES.forEach((k) => (c[k] = notices.filter((n) => n.category === k).length));
-    return c;
+  const stats = useMemo(() => getStats(notices, now), [notices, now]);
+  // Lets requestDelete read the latest notices without rebuilding the UI context on every change.
+  const noticesRef = useRef(notices);
+  useEffect(() => {
+    noticesRef.current = notices;
   }, [notices]);
 
-  const stats = useMemo(() => {
-    const open = (n: Notice) => !n.dueDate || daysUntil(n.dueDate) >= 0;
-    return {
-      active: notices.filter(open).length,
-      unread: notices.filter((n) => !n.isRead).length,
-      pendingAssignments: notices.filter((n) => n.category === 'Assignments' && n.dueDate && daysUntil(n.dueDate) >= 0).length,
-      upcomingExams: notices.filter((n) => n.category === 'Exams' && n.dueDate && daysUntil(n.dueDate) >= 0).length,
-    };
-  }, [notices]);
+  const notify = useCallback((message: string) => setToast({ id: Date.now(), message }), []);
+  const dismissToast = useCallback(() => setToast(null), []);
+
+  const ui = useMemo<UIContextValue>(
+    () => ({
+      search,
+      setSearch,
+      // Only one dialog is open at a time, so opening one closes the detail view first.
+      openComposer: (notice) => {
+        setDetailsId(null);
+        setComposer({ open: true, notice: notice ?? null });
+      },
+      openDetails: (id) => setDetailsId(id),
+      requestDelete: (id) => {
+        const target = noticesRef.current.find((n) => n.id === id);
+        if (!target?.isUserCreated) return;
+        setDetailsId(null);
+        setConfirmOptions({
+          title: 'Delete this notice?',
+          message: `“${target.title}” will be removed from this browser. This can’t be undone.`,
+          confirmLabel: 'Delete notice',
+          onConfirm: () => {
+            deleteNotice(id);
+            notify('Notice deleted');
+          },
+        });
+      },
+      confirm: (options) => setConfirmOptions(options),
+      notify,
+    }),
+    [search, deleteNotice, notify],
+  );
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    if (value.trim() && !SEARCHABLE.includes(route)) navigate('notices');
+  };
+
+  // On navigation: update the tab title, close the drawer, scroll up and move focus to the new page.
+  useEffect(() => {
+    document.title = `${ROUTE_TITLES[route]} · CampusBoard`;
+    setDrawerOpen(false);
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0 });
+    mainRef.current?.focus({ preventScroll: true });
+  }, [route]);
+
+  const anyOverlay = composer.open || !!detailsId || !!confirmOptions || drawerOpen;
 
   // Keyboard shortcuts: "/" focuses search, "n" opens the composer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (modalOpen || e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
+      if (anyOverlay || e.metaKey || e.ctrlKey || e.altKey || t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
       if (e.key === '/') {
         e.preventDefault();
         searchRef.current?.focus();
       } else if (e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        setModalOpen(true);
+        ui.openComposer();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modalOpen]);
+  }, [anyOverlay, ui]);
 
-  const closeModal = useCallback(() => setModalOpen(false), []);
-  const filtered = !!search.trim() || category !== 'All' || quick !== 'All';
+  const closeComposer = useCallback(() => setComposer({ open: false, notice: null }), []);
+  const closeDetails = useCallback(() => setDetailsId(null), []);
+  const closeConfirm = useCallback(() => setConfirmOptions(null), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+  const page = {
+    dashboard: <DashboardPage />,
+    notices: <NoticesPage key="all" preset="all" />,
+    important: <NoticesPage key="important" preset="important" />,
+    unread: <NoticesPage key="unread" preset="unread" />,
+    deadlines: <DeadlinesPage />,
+    settings: <SettingsPage theme={theme} onToggleTheme={toggle} />,
+  }[route];
 
   return (
-    <div className="min-h-screen">
-      <Navbar ref={searchRef} search={search} onSearch={setSearch} theme={theme} onToggleTheme={toggle} onNew={() => setModalOpen(true)} />
+    <UIContext.Provider value={ui}>
+      <button
+        type="button"
+        onClick={() => mainRef.current?.focus()}
+        className="sr-only z-[70] rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
+      >
+        Skip to content
+      </button>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Class notices</h1>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-            Everything students, parents and class reps need to know — in one place.
-          </p>
-        </div>
+      <Sidebar route={route} stats={stats} drawerOpen={drawerOpen} onCloseDrawer={closeDrawer} onNew={() => ui.openComposer()} />
 
-        <StatSummary {...stats} />
-
-        <FilterBar category={category} onCategory={setCategory} quick={quick} onQuick={setQuick} sort={sort} onSort={setSort} counts={counts} />
-
-        <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
-          <span aria-live="polite">
-            {visible.length} {visible.length === 1 ? 'notice' : 'notices'}
-          </span>
-          {stats.unread > 0 && (
-            <button
-              onClick={() => setFlags((f) => Object.fromEntries(notices.map((n) => [n.id, { ...f[n.id], isRead: true }])))}
-              className="font-medium transition hover:text-neutral-900 dark:hover:text-neutral-100"
-            >
-              Mark all as read
-            </button>
-          )}
-        </div>
-
-        <NoticeGrid
-          notices={visible}
-          filtered={filtered}
-          onClearFilters={() => {
-            setSearch('');
-            setCategory('All');
-            setQuick('All');
-          }}
-          onToggleStar={(id) => setFlag(id, 'isStarred')}
-          onToggleRead={(id) => setFlag(id, 'isRead')}
-          onMarkRead={(id) => setFlag(id, 'isRead', true)}
-          isDeletable={(id) => customIds.has(id)}
-          onDelete={(id) => setCustom((c) => c.filter((n) => n.id !== id))}
+      <div className="min-h-screen md:pl-[76px] lg:pl-[17.5rem]">
+        <Navbar
+          ref={searchRef}
+          search={search}
+          onSearch={handleSearch}
+          theme={theme}
+          onToggleTheme={toggle}
+          onNew={() => ui.openComposer()}
+          onOpenMenu={() => setDrawerOpen(true)}
+          menuOpen={drawerOpen}
         />
-      </main>
+        <main
+          ref={mainRef}
+          id="main"
+          tabIndex={-1}
+          aria-label={ROUTE_TITLES[route]}
+          className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-6 outline-none sm:px-6 lg:px-8 lg:pt-8"
+        >
+          {page}
+        </main>
+      </div>
 
-      <AddNoticeModal open={modalOpen} onClose={closeModal} onSubmit={(n) => setCustom((c) => [n, ...c])} />
-    </div>
+      {composer.open && <AddNoticeModal notice={composer.notice} onClose={closeComposer} />}
+      <NoticeDetailModal id={detailsId} onClose={closeDetails} />
+      <ConfirmDialog options={confirmOptions} onClose={closeConfirm} />
+      <Toast toast={toast} onDismiss={dismissToast} />
+    </UIContext.Provider>
   );
 }

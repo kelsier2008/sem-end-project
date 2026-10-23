@@ -3,6 +3,67 @@
 @tailwind utilities;
 
 @layer base {
+  /* Space-separated RGB so Tailwind can apply opacity, e.g. bg-surface/80 */
+  :root {
+    --canvas: 248 247 252;      /* #F8F7FC */
+    --surface: 255 255 255;
+    --raised: 244 242 250;
+    --line: 235 232 244;        /* #EBE8F4 */
+    --line-strong: 216 211 232;
+    --ink: 43 35 68;            /* #2B2344 */
+    --ink-soft: 74 66 98;
+    --ink-muted: 110 103 135;
+    --accent-soft: 243 237 255;
+    --accent-text: 91 31 214;
+    color-scheme: light;
+  }
+
+  .dark {
+    --canvas: 15 12 23;
+    --surface: 23 19 32;
+    --raised: 31 26 43;
+    --line: 43 37 62;
+    --line-strong: 62 54 86;
+    --ink: 236 234 243;
+    --ink-soft: 190 184 206;
+    --ink-muted: 150 143 170;
+    --accent-soft: 45 30 84;
+    --accent-text: 196 170 255;
+    color-scheme: dark;
+  }
+
   html { -webkit-font-smoothing: antialiased; }
-  body { @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100; }
+  body { @apply bg-canvas text-ink; }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Dialogs never grow past the visible viewport (dvh accounts for mobile browser bars). */
+  .dialog-max-h {
+    max-height: 92vh;
+    max-height: 92dvh;
+  }
+
+  /* Swipeable chip rows on phones: keep scrolling, hide the bar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

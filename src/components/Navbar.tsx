@@ -1,5 +1,8 @@
 import { forwardRef } from 'react';
-import { Megaphone, Moon, Plus, Search, Sun, X } from 'lucide-react';
+import { Menu, Moon, Plus, Search, Sun, X } from 'lucide-react';
+import { href } from '../router';
+import { btnBase, btnTone, iconBtn, iconBtnBase } from '../styles';
+import { LogoMark, Wordmark } from './Logo';
 
 interface Props {
   search: string;
@@ -7,66 +10,74 @@ interface Props {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onNew: () => void;
+  onOpenMenu: () => void;
+  menuOpen: boolean;
 }
 
+/** Top bar: global search, theme toggle and the Add notice action. */
 const Navbar = forwardRef<HTMLInputElement, Props>(function Navbar(
-  { search, onSearch, theme, onToggleTheme, onNew },
+  { search, onSearch, theme, onToggleTheme, onNew, onOpenMenu, menuOpen },
   searchRef,
 ) {
   return (
-    <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
-            <Megaphone className="h-4 w-4" />
-          </div>
-          <div className="hidden leading-tight sm:block">
-            <p className="text-sm font-semibold tracking-tight">NoticeBoard</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Announcements & deadlines</p>
-          </div>
-        </div>
+    <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
+      <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          aria-label="Open navigation menu"
+          aria-expanded={menuOpen}
+          className={`${iconBtn} -ml-1.5 md:hidden`}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <a href={href('dashboard')} className="flex shrink-0 items-center gap-2 rounded-xl md:hidden" aria-label="CampusBoard dashboard">
+          <LogoMark className="h-8 w-8" />
+          <Wordmark className="hidden sm:inline" />
+        </a>
 
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+        <div role="search" className="relative min-w-0 flex-1 md:max-w-xl">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden />
           <input
             ref={searchRef}
             type="search"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search notices…"
-            aria-label="Search notices"
-            className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-16 text-sm outline-none transition duration-200 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:ring-4 focus:ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-900 dark:focus:border-neutral-700 dark:focus:bg-neutral-900 dark:focus:ring-white/5 [&::-webkit-search-cancel-button]:hidden"
+            placeholder="Search notices"
+            aria-label="Search notices by title, text, department or author"
+            className="h-10 w-full rounded-xl border border-line bg-surface pl-9 pr-10 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-muted/80 hover:border-line-strong focus:border-brand-400 focus:ring-4 focus:ring-brand-500/15 [&::-webkit-search-cancel-button]:hidden"
           />
           {search ? (
             <button
+              type="button"
               onClick={() => onSearch('')}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+              className="absolute right-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-ink-muted transition hover:bg-raised hover:text-ink"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           ) : (
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-neutral-200 bg-white px-1.5 text-[10px] font-medium text-neutral-400 sm:block dark:border-neutral-700 dark:bg-neutral-800">
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line bg-raised px-1.5 py-0.5 text-[11px] font-medium text-ink-muted sm:block">
               /
             </kbd>
           )}
         </div>
 
-        <button
-          onClick={onToggleTheme}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-neutral-200 text-neutral-600 transition duration-200 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-
-        <button
-          onClick={onNew}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-neutral-900 px-3 text-sm font-medium text-white shadow-sm transition duration-200 hover:bg-neutral-700 active:scale-[0.98] dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New Notice</span>
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+            className={`${iconBtnBase} h-10 w-10 border border-line bg-surface text-ink-muted hover:bg-raised hover:text-ink`}
+          >
+            {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+          </button>
+          <button type="button" onClick={onNew} className={`${btnBase} ${btnTone.primary} h-10 w-10 sm:w-auto sm:px-4`} aria-label="Add notice">
+            <Plus className="h-[18px] w-[18px]" aria-hidden />
+            <span className="hidden sm:inline">Add notice</span>
+          </button>
+        </div>
       </div>
     </header>
   );

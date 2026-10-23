@@ -1,139 +1,127 @@
-import { useState } from 'react';
-import { CalendarDays, Check, ChevronDown, Clock, Star, Trash2, User } from 'lucide-react';
+import { useId } from 'react';
+import { ArrowRight, Building2, CalendarDays, Check, CheckCheck, Mail, Pencil, Star, Trash2, UserRound } from 'lucide-react';
+import { useNotices } from '../state/useNotices';
+import { useUI } from '../state/ui';
+import { iconBtn, iconBtnBase } from '../styles';
 import type { Notice } from '../types';
-import { categoryStyles, daysUntil, formatDate, relativeDue, urgencyDot } from '../utils';
+import { formatPosted } from '../utils';
+import { CategoryBadge, DeadlineChip, UrgentBadge } from './NoticeBadges';
 
-interface Props {
-  notice: Notice;
-  onToggleStar: (id: string) => void;
-  onToggleRead: (id: string) => void;
-  onMarkRead: (id: string) => void;
-  onDelete?: (id: string) => void;
-}
-
-const PREVIEW = 140;
-
-export default function NoticeCard({ notice, onToggleStar, onToggleRead, onMarkRead, onDelete }: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const long = notice.content.length > PREVIEW;
-  const due = notice.dueDate ? daysUntil(notice.dueDate) : null;
-  const overdue = due !== null && due < 0;
-  const soon = due !== null && due >= 0 && due <= 3;
-
-  const toggleExpand = () => {
-    setExpanded((e) => !e);
-    if (!notice.isRead) onMarkRead(notice.id);
-  };
+export default function NoticeCard({ notice: n }: { notice: Notice }) {
+  const { now, toggleRead, toggleStar } = useNotices();
+  const { openDetails, openComposer, requestDelete } = useUI();
+  const titleId = useId();
+  const unread = !n.isRead;
 
   return (
     <article
-      className={`group relative flex flex-col rounded-xl border bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-neutral-900 dark:hover:shadow-black/40 ${
-        notice.isRead
-          ? 'border-neutral-200 dark:border-neutral-800'
-          : 'border-neutral-300 dark:border-neutral-700'
-      } ${overdue ? 'opacity-70' : ''}`}
+      aria-labelledby={titleId}
+      className={`group relative flex w-full flex-col rounded-2xl border bg-surface p-5 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lift ${
+        unread ? 'border-line-strong' : 'border-line'
+      }`}
     >
+      {unread && <span aria-hidden className="absolute bottom-5 left-0 top-5 w-[3px] rounded-r-full bg-brand-500" />}
+
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${categoryStyles[notice.category]}`}>
-            {notice.category}
-          </span>
-          {notice.urgency && (
-            <span className="inline-flex items-center gap-1.5 text-xs capitalize text-neutral-500 dark:text-neutral-400" title={`${notice.urgency} urgency`}>
-              <span className="relative flex h-2 w-2">
-                {notice.urgency === 'high' && !overdue && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-60" />
-                )}
-                <span className={`relative inline-flex h-2 w-2 rounded-full ${urgencyDot[notice.urgency]}`} />
-              </span>
-              {notice.urgency}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <CategoryBadge category={n.category} />
+          {n.priority === 'High' && <UrgentBadge />}
+          {unread ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-text">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" aria-hidden />
+              Unread
             </span>
-          )}
-          {!notice.isRead && (
-            <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-              New
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-muted">
+              <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+              Read
             </span>
           )}
         </div>
-
         <button
-          onClick={() => onToggleStar(notice.id)}
-          aria-label={notice.isStarred ? 'Unstar notice' : 'Star notice'}
-          aria-pressed={!!notice.isStarred}
-          className={`-m-1 rounded-md p-1 transition duration-200 hover:scale-110 ${
-            notice.isStarred ? 'text-amber-500' : 'text-neutral-300 hover:text-neutral-500 dark:text-neutral-600 dark:hover:text-neutral-400'
+          type="button"
+          onClick={() => toggleStar(n.id)}
+          aria-label={n.isStarred ? `Remove “${n.title}” from important` : `Mark “${n.title}” as important`}
+          aria-pressed={n.isStarred}
+          title={n.isStarred ? 'Starred as important' : 'Star as important'}
+          className={`-m-1.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl transition duration-150 hover:bg-raised ${
+            n.isStarred ? 'text-amber-500' : 'text-ink-muted/60 hover:text-ink-muted'
           }`}
         >
-          <Star className="h-4 w-4" fill={notice.isStarred ? 'currentColor' : 'none'} />
+          <Star className="h-[18px] w-[18px]" fill={n.isStarred ? 'currentColor' : 'none'} />
         </button>
       </div>
 
-      <h3 className={`mt-3 text-[15px] leading-snug tracking-tight ${notice.isRead ? 'font-medium' : 'font-semibold'}`}>
-        {notice.title}
+      <h3 id={titleId} className={`mt-3 text-[15px] leading-snug tracking-tight text-ink ${unread ? 'font-semibold' : 'font-medium'}`}>
+        {n.title}
       </h3>
+      <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">{n.description}</p>
 
-      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
-        {expanded || !long ? notice.content : `${notice.content.slice(0, PREVIEW).trimEnd()}…`}
-      </p>
-      {long && (
-        <button
-          onClick={toggleExpand}
-          aria-expanded={expanded}
-          className="mt-1.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-        >
-          {expanded ? 'Show less' : 'Read more'}
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-        </button>
+      {n.deadline && (
+        <div className="mt-3">
+          <DeadlineChip deadline={n.deadline} category={n.category} now={now} />
+        </div>
       )}
 
-      <div className="mt-auto pt-4">
-        {notice.dueDate && (
-          <div
-            className={`mb-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${
-              overdue
-                ? 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-800 dark:text-neutral-500'
-                : soon
-                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'
-                  : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            {relativeDue(notice.dueDate)} · {formatDate(notice.dueDate)}
-          </div>
-        )}
+      <dl className="mb-4 mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-ink-muted">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <dt className="sr-only">Department</dt>
+          <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <dd className="truncate">{n.department}</dd>
+        </div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <dt className="sr-only">Posted by</dt>
+          <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <dd className="truncate">
+            {n.author}
+            {n.isUserCreated && <span className="ml-1 font-medium text-accent-text">(you)</span>}
+          </dd>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <dt className="sr-only">Published</dt>
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <dd>
+            <time dateTime={n.publishedAt}>{formatPosted(n.publishedAt, now)}</time>
+          </dd>
+        </div>
+      </dl>
 
-        <div className="flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="inline-flex min-w-0 items-center gap-1">
-              <User className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{notice.author}</span>
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-1">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {formatDate(notice.date)}
-            </span>
-          </div>
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-3">
+        <button
+          type="button"
+          onClick={() => toggleRead(n.id)}
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-ink-soft transition duration-150 hover:bg-raised hover:text-ink"
+        >
+          {unread ? <Check className="h-4 w-4" aria-hidden /> : <Mail className="h-4 w-4" aria-hidden />}
+          {unread ? 'Mark as read' : 'Mark as unread'}
+        </button>
 
-          <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition duration-200 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-            <button
-              onClick={() => onToggleRead(notice.id)}
-              title={notice.isRead ? 'Mark as unread' : 'Mark as read'}
-              aria-label={notice.isRead ? 'Mark as unread' : 'Mark as read'}
-              className="rounded-md p-1.5 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            >
-              <Check className={`h-3.5 w-3.5 ${notice.isRead ? 'text-emerald-500' : ''}`} />
-            </button>
-            {onDelete && (
-              <button
-                onClick={() => onDelete(notice.id)}
-                title="Delete notice"
-                aria-label="Delete notice"
-                className="rounded-md p-1.5 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-0.5">
+          {n.isUserCreated && (
+            <>
+              <button type="button" onClick={() => openComposer(n)} aria-label={`Edit “${n.title}”`} title="Edit" className={iconBtn}>
+                <Pencil className="h-4 w-4" />
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => requestDelete(n.id)}
+                aria-label={`Delete “${n.title}”`}
+                title="Delete"
+                className={`${iconBtnBase} h-9 w-9 text-ink-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-300`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => openDetails(n.id)}
+            aria-label={`View details: ${n.title}`}
+            className="inline-flex h-9 items-center gap-1 rounded-xl px-2.5 text-xs font-semibold text-accent-text transition duration-150 hover:bg-accent-soft"
+          >
+            View details
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden />
+          </button>
         </div>
       </div>
     </article>
