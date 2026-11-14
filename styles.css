@@ -290,10 +290,10 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .list-panel { display: flex; flex-direction: column; padding: 8px; }
 
-.widget { display: flex; flex-direction: column; gap: 4px; padding: 14px 8px 8px; }
+.widget { display: flex; flex-direction: column; gap: 4px; padding: 14px 8px 8px; min-width: 0; }
 .widget > .section-header { padding: 0 12px 4px; }
 .widget-empty { padding: 12px; font-size: 13px; color: var(--text-3); }
-.mine { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.mine { display: flex; flex-direction: column; gap: 12px; padding: 16px; min-width: 0; }
 .mine .list { display: flex; flex-direction: column; margin: 0 -8px -8px; }
 
 /* ---------- Notice card ---------- */
@@ -663,7 +663,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .hero-summary { display: none; }
   .stats { gap: 12px; }
   .stat { padding: 16px; }
-  .col, .col.side { display: flex; gap: 16px; }
+  .col, .col.side { display: flex; gap: 16px; align-items: stretch; }
 
   .page-header h1 { font-size: 24px; }
   .page-header .btn { margin-left: 0; }
