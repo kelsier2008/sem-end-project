@@ -675,6 +675,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .group .row .chip { display: none; }
 
   .modal-backdrop { padding: 12px 0 0; align-items: flex-end; }
+  .modal-backdrop.drawer-backdrop { padding: 0; align-items: stretch; }
   .modal { max-width: none; max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); border-radius: 16px 16px 0 0; }
   .modal.sm { margin: 0; }
   .modal-header { padding: 16px 12px 14px 16px; }
