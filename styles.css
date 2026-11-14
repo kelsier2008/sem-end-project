@@ -650,7 +650,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .topbar { padding: 12px 16px; gap: 8px; }
   .topbar .logo-mark { width: 32px; height: 32px; }
   .topbar .spacer { display: none; }
-  .search { width: auto; flex: 1; height: 38px; }
+  .search { width: auto; flex: 1; min-width: 0; height: 38px; padding: 0 10px; }
+  .search input { width: 100%; }
   .search kbd { display: none; }
   .icon-btn { width: 36px; height: 36px; }
   .add-btn { width: 36px; height: 36px; padding: 0; }
