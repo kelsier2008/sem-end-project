@@ -1453,10 +1453,13 @@
     }, true);
     els.search.addEventListener('input', onSearchInput);
     els.search.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && els.search.value) {
-        e.stopPropagation();
+      if (e.key !== 'Escape' || modals.length) return;
+      e.stopPropagation();
+      if (els.search.value) {
         els.search.value = '';
         onSearchInput();
+      } else {
+        els.search.blur();
       }
     });
     window.addEventListener('hashchange', onRoute);
