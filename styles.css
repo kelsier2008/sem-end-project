@@ -511,6 +511,7 @@ kbd.key {
 .modal-sub { font-size: 13px; color: var(--text-2); }
 .modal-header .icon-btn { margin: -4px -4px 0 0; }
 .modal-body { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px 24px; overflow-y: auto; }
+.modal-body > * { flex-shrink: 0; }
 .modal-footer {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   padding: 14px 24px; border-top: 1px solid var(--border);
@@ -679,7 +680,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .modal-header { padding: 16px 12px 14px 16px; }
   .modal-body { padding: 16px; }
   .modal-footer { padding: 12px 16px; }
-  .modal-footer .footer-note { display: none; }
+  .modal-footer .footer-note, .modal-footer .spacer { display: none; }
+  .modal-footer .btn { flex: 1 1 auto; }
   .form-row, .details-grid { grid-template-columns: minmax(0, 1fr); }
   .settings-panel { padding: 20px; }
   .shortcuts { grid-template-columns: minmax(0, 1fr); }
