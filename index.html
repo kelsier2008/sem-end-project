@@ -1,26 +1,71 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CampusBoard</title>
-    <meta name="description" content="CampusBoard: every important campus update, organized in one place." />
-    <meta name="theme-color" content="#7B39FC" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script>
-      // Apply the saved or system theme before first paint to avoid a flash.
-      try {
-        const t = localStorage.getItem('noticeboard:theme');
-        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-      } catch {}
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusBoard</title>
+  <meta name="description" content="Stay updated. Never miss a deadline. Your campus announcements, all in one place.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    // Set the theme before the page paints so it never flashes the wrong colours.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('campusboard:theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+</head>
+<body>
+  <button class="skip-link" data-action="skip">Skip to content</button>
+
+  <div class="app" id="app">
+    <!-- Sidebar (desktop), icon rail (tablet). Phones use the drawer instead. -->
+    <aside class="sidebar" aria-label="Sidebar">
+      <a class="logo" href="#dashboard" aria-label="CampusBoard, go to dashboard">
+        <span class="logo-mark"><span data-icon="pin"></span></span>
+        <span class="logo-text">CampusBoard</span>
+      </a>
+      <button class="btn primary block" data-action="add" aria-label="Add notice">
+        <span data-icon="plus" data-icon-class="sm"></span><span class="add-label">Add notice</span>
+      </button>
+      <nav class="nav" id="sidebar-nav" aria-label="Main"></nav>
+      <div class="storage-note">
+        <strong>Prototype</strong>
+        <p>Notices are saved in this browser only and aren’t shared with others.</p>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn only-mobile" data-action="menu" aria-label="Open menu"><span data-icon="menu"></span></button>
+        <a class="logo-mark only-mobile" href="#dashboard" aria-label="CampusBoard, go to dashboard"><span data-icon="pin"></span></a>
+        <div class="search" role="search">
+          <span data-icon="search" data-icon-class="sm"></span>
+          <label class="sr-only" for="search">Search notices</label>
+          <input id="search" type="search" placeholder="Search notices" autocomplete="off" spellcheck="false">
+          <kbd aria-hidden="true">/</kbd>
+        </div>
+        <span class="spacer"></span>
+        <button class="icon-btn" data-action="theme-toggle" aria-label="Switch theme"></button>
+        <button class="btn primary add-btn" data-action="add" aria-label="Add notice">
+          <span data-icon="plus" data-icon-class="sm"></span><span class="add-label">Add notice</span>
+        </button>
+      </header>
+
+      <main id="view" class="content" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
 </html>
