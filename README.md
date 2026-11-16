@@ -2,7 +2,7 @@
 
 Stay updated. Never miss a deadline. CampusBoard puts every campus announcement and deadline in one place.
 
-**Live app:** _link added after deploy_
+**Live app:** https://kelsier2008.github.io/sem-end-project/
 
 ## What it does
 
